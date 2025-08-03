@@ -1,6 +1,7 @@
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.fernet import Fernet
+import base64
 from dotenv import load_dotenv
 import os
 
@@ -28,12 +29,11 @@ class HybirdEncryption:
         )
 
         self.encrypted_message = None
-        self.encrypted_symmetric_key_to_send_to_recipient = None
         self.decrypted_message = None
 
-        print(self.own_pem_private_key)
-        print(self.own_pem_public_key)
-        print("=" * 50)
+        # print(self.own_pem_private_key)
+        # print(self.own_pem_public_key)
+        # print("=" * 50)
 
     def send_message(self, message, recipient_public_key_pem):
         """
@@ -47,6 +47,16 @@ class HybirdEncryption:
             self._encrypt_message(recipient_public_key_pem, message)
         )
 
+        print(
+            "Send exactly this to the recipient:\n\n",
+            "Copy and paste this exact encrypted message:\n\n",
+            encrypted_message.decode("utf-8"),
+            "\n\n",
+            "Copy and paste this exact encrypted symmetric key:\n\n",
+            encrypted_symmetric_key_to_send_to_recipient,
+            "\n",
+        )
+
         return encrypted_message, encrypted_symmetric_key_to_send_to_recipient
 
     def receive_message(self, encrypted_message, encrypted_symmetric_key_from_sender):
@@ -55,6 +65,12 @@ class HybirdEncryption:
         """
         if not self.own_pem_private_key:
             raise ValueError("Private key is not set. Please generate keys first.")
+
+        if isinstance(encrypted_message, str):
+            encrypted_message = encrypted_message.encode("utf-8")
+            print(
+                "Received encrypted message as string, converting to bytes for decryption."
+            )
 
         decrypted_message = self._decrypt_message(
             encrypted_message, encrypted_symmetric_key_from_sender
@@ -98,7 +114,7 @@ class HybirdEncryption:
                 format=serialization.PrivateFormat.PKCS8,
                 encryption_algorithm=serialization.NoEncryption(),
             )
-            
+
             own_public_pem = public_key.public_bytes(
                 encoding=serialization.Encoding.PEM,
                 format=serialization.PublicFormat.SubjectPublicKeyInfo,
@@ -110,8 +126,8 @@ class HybirdEncryption:
 
             print(
                 "\nCopy and paste the following into your .env file:\n"
-                f'OWN_PEM_PRIVATE_KEY={own_private_pem_str}\n'
-                f'OWN_PEM_PUBLIC_KEY={own_public_pem_str}\n'
+                f"OWN_PEM_PRIVATE_KEY={own_private_pem_str}\n"
+                f"OWN_PEM_PUBLIC_KEY={own_public_pem_str}\n"
             )
 
             # Also return as bytes for internal use
@@ -138,7 +154,7 @@ class HybirdEncryption:
 
         # 3. Encrypt the symmetric key with the recipient's public RSA key
         # This is the key that will be sent along with the encypted message to the recipient
-        self.encrypted_symmetric_key_to_send_to_recipient = public_key.encrypt(
+        encrypted_symmetric_key_to_send_to_recipient = public_key.encrypt(
             symmetric_key,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -146,7 +162,12 @@ class HybirdEncryption:
                 label=None,
             ),
         )
-        return self.encrypted_message, self.encrypted_symmetric_key_to_send_to_recipient
+
+        encrypted_symmetric_key_to_send_to_recipient = base64.b64encode(
+            encrypted_symmetric_key_to_send_to_recipient
+        ).decode("utf-8")
+
+        return self.encrypted_message, encrypted_symmetric_key_to_send_to_recipient
 
     def _decrypt_message(self, encrypted_message, encrypted_symmetric_key_from_sender):
         """
@@ -158,8 +179,12 @@ class HybirdEncryption:
         )
 
         # 1. Decrypt the symmetric key with your private RSA key
+        # Decode from base64 to bytes
+        encrypted_symmetric_key_bytes = base64.b64decode(
+            encrypted_symmetric_key_from_sender
+        )
         symmetric_key = private_key.decrypt(
-            encrypted_symmetric_key_from_sender,
+            encrypted_symmetric_key_bytes,
             padding.OAEP(
                 mgf=padding.MGF1(algorithm=hashes.SHA256()),
                 algorithm=hashes.SHA256(),
@@ -174,53 +199,60 @@ class HybirdEncryption:
         return self.decrypted_message
 
 
-encrypt = HybirdEncryption()
+if __name__ == "__main__":
+    encrypt = HybirdEncryption()
 
-private, public = encrypt._generate_keys()
+    private, public = encrypt._generate_keys()
 
-# print("Private key:", private)
-# print("Public key:", public)
+    # print("Private key:", private)
+    # print("Public key:", public)
 
-message = "Example message to encrypt and send."
+    message = "Example message to encrypt and send."
 
-encrypted_message, encrypted_symmetric_key = encrypt.send_message(
-    message, encrypt.own_pem_public_key
-)
+    encrypted_message, encrypted_symmetric_key = encrypt.send_message(
+        message, encrypt.own_pem_public_key
+    )
 
-print("Encrypted message starts on new line:\n\n", encrypted_message, "\n")
-print(
-    "Encrypted symmetric key to send to recipient starts on new line:\n\n",
-    encrypted_symmetric_key,
-    "\n",
-)
+    decoded_message = encrypted_message.decode("utf-8")
 
-original_message = encrypt.receive_message(encrypted_message, encrypted_symmetric_key)
+    original_message = encrypt.receive_message(
+        encrypted_message, encrypted_symmetric_key
+    )
 
-print("Original message:", message)
+    print("Original message:", message)
 
-# # --- How to Use It ---
+    # print(
+    #     "Encrypted message starts on new line:\n\n", encrypted_message.decode("utf-8"), "\n"
+    # )
+    # print(
+    #     "Encrypted symmetric key to send to recipient starts on new line:\n\n",
+    #     encrypted_symmetric_key,
+    #     "\n",
+    # )
 
-# # 1. The RECIPIENT generates a key pair.
-# #    They must save the private key and keep it secret.
-# #    They send the public key to the sender.
-# private_key, public_key = generate_keys()
+    # # --- How to Use It ---
 
-# # 2. The SENDER has a message to send.
-# secret_message = "This is a secret message that will be sent via Gmail."
+    # # 1. The RECIPIENT generates a key pair.
+    # #    They must save the private key and keep it secret.
+    # #    They send the public key to the sender.
+    # private_key, public_key = generate_keys()
 
-# # 3. The SENDER uses the RECIPIENT's public key to encrypt the message.
-# encrypted_message, encrypted_key = encrypt_message(public_key, secret_message)
+    # # 2. The SENDER has a message to send.
+    # secret_message = "This is a secret message that will be sent via Gmail."
 
-# # The sender would now send `encrypted_message` and `encrypted_key`
-# # to the recipient (e.g., in the body of an email).
+    # # 3. The SENDER uses the RECIPIENT's public key to encrypt the message.
+    # encrypted_message, encrypted_key = encrypt_message(public_key, secret_message)
 
-# # 4. The RECIPIENT receives the two encrypted components.
-# #    They use their own PRIVATE key to decrypt.
-# decrypted_message = decrypt_message(private_key, encrypted_message, encrypted_key)
+    # # The sender would now send `encrypted_message` and `encrypted_key`
+    # # to the recipient (e.g., in the body of an email).
 
-# print("Original Message:", secret_message)
-# print("\n---Sending via Gmail---")
-# print("Encrypted Message Sent:", encrypted_message)
-# print("Encrypted Key Sent:", encrypted_key)
-# print("\n---Recipient Side---")
-# print("Decrypted Message:", decrypted_message)
+    # # 4. The RECIPIENT receives the two encrypted components.
+    # #    They use their own PRIVATE key to decrypt.
+    # decrypted_message = decrypt_message(private_key, encrypted_message, encrypted_key)
+
+    # print("Original Message:", secret_message)
+    # print("\n---Sending via Gmail---")
+    # print("Encrypted Message Sent:", encrypted_message)
+    # print("Encrypted Key Sent:", encrypted_key)
+    # print("\n---Recipient Side---")
+    # print("Decrypted Message:", decrypted_message)
