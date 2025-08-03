@@ -1,6 +1,8 @@
 *.env
 *input
+*output
 input/recipient_key.txt
 input/message.txt
+output/decrypted_message.txt
 test_receive.py 
 test_send.py 
