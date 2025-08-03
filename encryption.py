@@ -127,7 +127,8 @@ class HybirdEncryption:
             print(
                 "\nCopy and paste the following into your .env file:\n"
                 f"OWN_PEM_PRIVATE_KEY={own_private_pem_str}\n"
-                f"OWN_PEM_PUBLIC_KEY={own_public_pem_str}\n"
+                f"OWN_PEM_PUBLIC_KEY={own_public_pem_str}\n\n"
+                "Make sure to send the OWN_PEM_PUBLIC_KEY to the recipient before they sned you a message.\n"
             )
 
             # Also return as bytes for internal use
