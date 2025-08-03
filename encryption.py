@@ -1,12 +1,13 @@
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.fernet import Fernet
+import argparse
 import base64
 from dotenv import load_dotenv
 import os
 
 
-class HybirdEncryption:
+class Encryption:
     def __init__(self):
         load_dotenv()
 
@@ -31,7 +32,6 @@ class HybirdEncryption:
         self.encrypted_message = None
         self.decrypted_message = None
 
-        # print(self.own_pem_private_key)
         # print(self.own_pem_public_key)
         # print("=" * 50)
 
@@ -42,13 +42,22 @@ class HybirdEncryption:
         if not recipient_public_key_pem:
             raise ValueError("Public key is not set. Please generate keys first.")
 
+        if isinstance(recipient_public_key_pem, str):
+            # Replace literal '\n' with real newlines before encoding
+            recipient_public_key_pem = recipient_public_key_pem.replace(
+                "\\n", "\n"
+            ).encode("utf-8")
+            print(
+                "Received recipient's public key as string, converting to bytes for encryption."
+            )
+
         self.message = message
         encrypted_message, encrypted_symmetric_key_to_send_to_recipient = (
             self._encrypt_message(recipient_public_key_pem, message)
         )
 
         print(
-            "Send exactly this to the recipient:\n\n",
+            "\nSend exactly this to the recipient:\n\n",
             "Copy and paste this exact encrypted message:\n\n",
             encrypted_message.decode("utf-8"),
             "\n\n",
@@ -201,7 +210,7 @@ class HybirdEncryption:
 
 
 if __name__ == "__main__":
-    encrypt = HybirdEncryption()
+    encrypt = Encryption()
 
     private, public = encrypt._generate_keys()
 
