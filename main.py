@@ -30,6 +30,9 @@ def main():
     recv_parser.add_argument(
         "--encrypted-key", required=True, help="Encrypted symmetric key (base64 string)"
     )
+    recv_parser.add_argument(
+        "--output-file", required=False, help="File to write the decrypted message to"
+    )
 
     args = parser.parse_args()
     encrypt = Encryption()
@@ -44,20 +47,60 @@ def main():
             # Try to read as file path
             with open(recipient_key, "r") as f:
                 recipient_key = f.read()
+                print(f"Loaded recipient key from {args.recipient_key}")
         except FileNotFoundError:
             # If not a file, assume it's a PEM string
+            print("Using provided recipient key directly.")
             pass
 
+        # Load message from file if needed
+        message = args.message
+        try:
+            with open(message, "r") as f:
+                message = f.read()
+                print(f"Loaded message from {args.message}")
+        except FileNotFoundError:
+            print("Using provided message directly.")
+            pass  # Use as direct string
+
         encrypted_message, encrypted_symmetric_key = encrypt.send_message(
-            args.message, recipient_key
+            message, recipient_key
         )
 
         print("\nEncrypted message:\n", encrypted_message.decode("utf-8"))
         print("\n\nEncrypted symmetric key:\n", encrypted_symmetric_key)
 
     elif args.command == "receive":
-        message = encrypt.receive_message(args.encrypted_message, args.encrypted_key)
-        print("Decrypted message:\n", message)
+        # Load recipient key from file if needed
+        encrypted_key = args.encrypted_key
+        try:
+            # Try to read as file path
+            with open(encrypted_key, "r") as f:
+                encrypted_key = f.read()
+                print(f"Loaded recipient key from {args.encrypted_key}")
+        except FileNotFoundError:
+            # If not a file, assume it's a PEM string
+            print("Using provided encryptedkey directly.")
+            pass
+
+        # Load message from file if needed
+        encrypted_message = args.encrypted_message
+        try:
+            with open(encrypted_message, "r") as f:
+                encrypted_message = f.read()
+                print(f"Loaded encrypted message from {args.encrypted_message}")
+        except FileNotFoundError:
+            print("Using provided message directly.")
+            pass  # Use as direct string
+
+        message = encrypt.receive_message(encrypted_message, encrypted_key)
+
+        if args.output_file:
+            with open(args.output_file, "w") as f:
+                f.write(message)
+            print(f"Decrypted message written to {args.output_file}")
+        else:
+            print("Decrypted message:\n", message)
 
 
 if __name__ == "__main__":

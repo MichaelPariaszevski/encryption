@@ -1,1 +1,4 @@
 *.env
+*input
+input/recipient_key.txt
+input/message.txt
